@@ -1,0 +1,13 @@
+[package]
+name = "scatmath"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+itertools = "0.14.0"
+rug = { version = "1.27", features = ["num-traits"] }
+
+[dependencies.gmp-mpfr-sys]
+version = "1.6.5"
+default-features = true
+features = ["use-system-libs"]
