@@ -43,7 +43,7 @@ pub trait MultiplicativeInverse {
     fn inverse(&self) -> Self;
 }
 
-pub trait MaybeMultiplicativeInverse: Sized {
+pub trait MaybeMultiplicativeInverse: Sized + MultiplicativeIdentity {
     /// Returns an option containing the inverse of `self` if it exists. Otherwise returns `None`.
     fn inverse(&self) -> Option<Self>;
 }

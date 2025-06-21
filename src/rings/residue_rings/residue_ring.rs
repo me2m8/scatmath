@@ -20,6 +20,11 @@ impl Zmod {
     }
 
     #[inline]
+    pub fn clone_modulus(&self) -> Rc<Integer> {
+        Rc::clone(&self.modulus)
+    }
+
+    #[inline]
     pub fn modulus(&self) -> &Integer {
         &self.modulus
     }

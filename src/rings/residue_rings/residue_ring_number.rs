@@ -15,6 +15,8 @@ use crate::{
     }, ring_trait::Ring},
 };
 
+use super::residue_ring::Zmod;
+
 pub struct ZmodNumber {
     inner: Integer,
     modulus: Option<Rc<Integer>>,
@@ -43,6 +45,10 @@ impl ZmodNumber {
 
     pub fn inner_mut(&mut self) -> &mut Integer {
         &mut self.inner
+    }
+
+    pub fn set_ring(&mut self, ring: &Zmod) {
+        self.modulus = Some(ring.clone_modulus())
     }
 
     fn clone_modulus(&self) -> Option<Rc<Integer>> {

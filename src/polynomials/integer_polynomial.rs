@@ -27,6 +27,8 @@ impl_op!(impl_mul_op, Polynomial<ZZ>, usize, Polynomial<ZZ>::scalar_mul_usize_ff
 
 #[cfg(test)]
 mod tests {
+    use std::task::Poll;
+
     use itertools::Itertools;
 
     use crate::{
@@ -228,5 +230,70 @@ mod tests {
         let res = &p1 * &p2;
 
         assert_eq!(res.coefficients(), int_vec(&[7, 22, 46, 77, 109, 142, 110, 63]));
+    }
+
+    #[test]
+    fn test_polynomial_zero_remainder() {
+        let c1 = int_vec(&[-1, 0, 1]);
+        let c2 = int_vec(&[-1, 1]);
+
+        let p1 = Polynomial::from_owned_coefficients(c1);
+        let p2 = Polynomial::from_owned_coefficients(c2);
+
+        let res = p1 % &p2;
+
+        assert!(res.is_zero());
+    }
+
+    #[test]
+    fn test_polynomial_zero_remainder_2() {
+        let c1 = int_vec(&[-1, 0, 0, 0, 1]);
+        let c2 = int_vec(&[-1, 1]);
+
+        let p1 = Polynomial::from_owned_coefficients(c1);
+        let p2 = Polynomial::from_owned_coefficients(c2);
+
+        let res = p1 % &p2;
+
+        assert!(res.is_zero());
+    }
+
+    #[test]
+    fn test_polynomial_remainder_r_greate_than_l() {
+        let c1 = int_vec(&[4, 6, 1]);
+        let c2 = int_vec(&[1, 2, 3, 4, 5, 6]);
+
+        let p1 = Polynomial::from_owned_coefficients(c1);
+        let p2 = Polynomial::from_owned_coefficients(c2);
+
+        let res = p1 % &p2;
+
+        assert_eq!(res.coefficients(), int_vec(&[4, 6, 1]));
+    }
+
+    #[test]
+    fn test_polynomial_remainder_1() {
+        let c1 = int_vec(&[1, 2, 3, 4, 5, 6]);
+        let c2 = int_vec(&[4, 6, 1]);
+
+        let p1 = Polynomial::from_owned_coefficients(c1);
+        let p2 = Polynomial::from_owned_coefficients(c2);
+
+        let res = p1 % &p2;
+
+        assert_eq!(res.coefficients(), int_vec(&[3477, 4552]));
+    }
+
+    #[test]
+    fn test_polynomial_remainder_2() {
+        let c1 = int_vec(&[1, 4, 7, 5, 2, 4, 65, 4, 12, 2]);
+        let c2 = int_vec(&[7, 5, 2, 4, 1, 1]);
+
+        let p1 = Polynomial::from_owned_coefficients(c1);
+        let p2 = Polynomial::from_owned_coefficients(c2);
+
+        let res = p1 % &p2;
+
+        assert_eq!(res.coefficients(), int_vec(&[36, -216, -60, -45, -169]));
     }
 }

@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 use rug::Integer;
 
 use crate::{impl_add_assign_op, impl_add_op, impl_assign_op, impl_eq, impl_mul_assign_op, impl_mul_op, impl_op, impl_sub_assign_op, impl_sub_op};
@@ -11,6 +11,10 @@ pub struct ZZ(Integer);
 impl ZZ {
     pub fn new(n: impl Into<Integer>) -> Self {
         ZZ(n.into())
+    }
+
+    pub fn gcd(&self, other: &Self) -> Self {
+        ZZ(self.0.clone().gcd(&other.0))
     }
 
     fn add_ffn(lhs: &Self, rhs: &Self) -> Self {
@@ -59,6 +63,10 @@ impl ZZ {
 
     fn mul_usize_assign_ffn(lhs: &mut Self, rhs: &usize) {
         lhs.0 *= rhs
+    }
+
+    fn div_ffn(lhs: &Self, rhs: &Self) -> Self {
+        ZZ(lhs.0.clone() / &rhs.0)
     }
 
     fn eq_ffn(lhs: &Self, rhs: &Self) -> bool {
@@ -113,6 +121,14 @@ impl MultiplicativeIdentity for ZZ {
 impl AdditiveInverse for ZZ {}
 impl AdditiveGroup for ZZ {}
 impl Ring for ZZ {}
+
+impl Div<&Self> for ZZ {
+    type Output = Self;
+
+    fn div(self, rhs: &Self) -> Self::Output {
+        Self::div_ffn(&self, rhs)
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Rem, Sub, SubAssign};
 
 use itertools::Itertools;
 
@@ -297,6 +297,57 @@ impl<R: Ring + Clone> Polynomial<R> {
     }
 
     //
+    // Polynomial Remainder
+    //
+
+    fn ref_polynomial_remainder_ffn(lhs: &Self, rhs: &Self) -> Self {
+        let mut a = lhs.coefficients().to_vec();
+        let b = rhs.coefficients();
+
+        Polynomial::polynomial_remainder_internal(&mut a, b);
+        Polynomial::from_owned_coefficients(a)
+    }
+
+    fn owned_polynomial_remainder_ffn(lhs: Self, rhs: &Self) -> Self {
+        let mut a = lhs.coefficients;
+        let b = rhs.coefficients();
+
+        Polynomial::polynomial_remainder_internal(&mut a, b);
+        Polynomial::from_owned_coefficients(a)
+    }
+
+    fn polynomial_remainder_assign_ffn(lhs: &mut Self, rhs: &Self) {
+        let b = rhs.coefficients();
+        Polynomial::polynomial_remainder_internal(&mut lhs.coefficients, b);
+    }
+
+    fn polynomial_remainder_internal(a: &mut Vec<R>, b: &[R]) {
+        let deg_b = b.len() - 1;
+        let lc_b = b[deg_b].clone();
+
+        while a.len() >= b.len() {
+            let deg_a = a.len() - 1;
+            let coeff_a = a[deg_a].clone();
+
+            for c in a.iter_mut() {
+                *c *= &lc_b;
+            }
+
+            let factor = coeff_a;
+            let shift = deg_a - deg_b;
+
+            (0..=deg_b).for_each(|i| {
+                let j = i + shift;
+                a[j] -= b[i].clone() * &factor;
+            });
+
+            while a.last().is_some_and(|c| *c == R::ZERO) {
+                a.pop();
+            }
+        }
+    }
+
+    //
     // Equality
     //
 
@@ -308,6 +359,8 @@ impl<R: Ring + Clone> Polynomial<R> {
                 .zip(rhs.coefficients().iter())
                 .all(|(a, b)| a == b)
     }
+
+    
 }
 
 impl<R: Ring + Clone> Default for Polynomial<R> {
@@ -419,6 +472,34 @@ impl_polynomial_assign_op!(impl_mul_assign_op, Polynomial<R>, Polynomial::polyno
 impl<R: Ring + Clone> MulSupport for Polynomial<R> {}
 
 //
+// Polynomial Remainder
+//
+
+macro_rules! impl_rem_op {
+    ($type:ty, $rhs:ty, $out:ty, $ffn:path, [$($bounds:tt)*]) => {
+        impl<$($bounds)*> Rem<$rhs> for $type {
+            type Output = $out;
+
+            fn rem(self, rhs: $rhs) -> Self::Output {
+                $ffn(self, &rhs)
+            }
+        }
+    };
+}
+
+impl_rem_op!(Polynomial<R>, Polynomial<R>, Polynomial<R>, Polynomial::owned_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(Polynomial<R>, &Polynomial<R>, Polynomial<R>, Polynomial::owned_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(Polynomial<R>, &mut Polynomial<R>, Polynomial<R>, Polynomial::owned_polynomial_remainder_ffn, [R: Ring + Clone]);
+
+impl_rem_op!(&Polynomial<R>, Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(&Polynomial<R>, &Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(&Polynomial<R>, &mut Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+
+impl_rem_op!(&mut Polynomial<R>, Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(&mut Polynomial<R>, &Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+impl_rem_op!(&mut Polynomial<R>, &mut Polynomial<R>, Polynomial<R>, Polynomial::ref_polynomial_remainder_ffn, [R: Ring + Clone]);
+
+//
 // Equality
 //
 
@@ -430,7 +511,7 @@ where
     R: Ring + Clone,
 {
     const ZERO: Self = Self {
-        coefficients: vec![],
+        coefficients: vec![], 
     };
 
     fn zero() -> Self {
