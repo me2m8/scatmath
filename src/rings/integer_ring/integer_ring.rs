@@ -1,7 +1,7 @@
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
-use rug::Integer;
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign, DivAssign};
+use rug::{ops::NegAssign, Integer};
 
-use crate::{impl_add_assign_op, impl_add_op, impl_assign_op, impl_eq, impl_mul_assign_op, impl_mul_op, impl_op, impl_sub_assign_op, impl_sub_op};
+use crate::{impl_add_assign_op, impl_add_op, impl_assign_op, impl_div_assign_op, impl_div_op, impl_eq, impl_mul_assign_op, impl_mul_op, impl_op, impl_sub_assign_op, impl_sub_op};
 
 use super::super::{group_trait::{AddSupport, AdditiveGroup, AdditiveIdentity, AdditiveInverse, EqSupport, MulSupport, MultiplicativeIdentity, SubSupport}, ring_trait::Ring};
 
@@ -17,11 +17,21 @@ impl ZZ {
         ZZ(self.0.clone().gcd(&other.0))
     }
 
-    fn add_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_add_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        lhs.0 += &rhs.0;
+        lhs
+    }
+
+    fn owned_add_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        lhs.0 += rhs;
+        lhs
+    }
+
+    fn ref_add_ffn(lhs: &Self, rhs: &Self) -> Self {
         ZZ(lhs.0.clone() + &rhs.0)
     }
 
-    fn add_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_add_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         ZZ(lhs.0.clone() + rhs)
     }
 
@@ -33,11 +43,21 @@ impl ZZ {
         lhs.0 += rhs
     }
 
-    fn sub_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_sub_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        lhs.0 -= &rhs.0;
+        lhs
+    }
+
+    fn owned_sub_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        lhs.0 -= rhs;
+        lhs
+    }
+
+    fn ref_sub_ffn(lhs: &Self, rhs: &Self) -> Self {
         ZZ(lhs.0.clone() - &rhs.0)
     }
 
-    fn sub_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_sub_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         ZZ(lhs.0.clone() - rhs)
     }
 
@@ -49,11 +69,21 @@ impl ZZ {
         lhs.0 -= rhs
     }
 
-    fn mul_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_mul_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        lhs.0 *= &rhs.0;
+        lhs
+    }
+
+    fn owned_mul_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        lhs.0 *= rhs;
+        lhs
+    }
+
+    fn ref_mul_ffn(lhs: &Self, rhs: &Self) -> Self {
         ZZ(lhs.0.clone() * &rhs.0)
     }
 
-    fn mul_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_mul_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         ZZ(lhs.0.clone() * rhs)
     }
 
@@ -65,8 +95,30 @@ impl ZZ {
         lhs.0 *= rhs
     }
 
-    fn div_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_div_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        lhs.0 /= &rhs.0;
+        lhs
+    }
+
+    fn owned_div_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        lhs.0 /= rhs;
+        lhs
+    }
+
+    fn ref_div_ffn(lhs: &Self, rhs: &Self) -> Self {
         ZZ(lhs.0.clone() / &rhs.0)
+    }
+
+    fn ref_div_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+        ZZ(lhs.0.clone() / rhs)
+    }
+
+    fn div_assign_ffn(lhs: &mut Self, rhs: &Self) {
+        lhs.0 /= &rhs.0
+    }
+
+    fn div_usize_assign_ffn(lhs: &mut Self, rhs: &usize) {
+        lhs.0 /= rhs
     }
 
     fn eq_ffn(lhs: &Self, rhs: &Self) -> bool {
@@ -74,20 +126,25 @@ impl ZZ {
     }
 }
 
-impl_op!(impl_add_op, ZZ, ZZ, ZZ::add_ffn, []);
-impl_op!(impl_add_op, ZZ, usize, ZZ::add_usize_ffn, []);
+impl_op!(impl_add_op, ZZ, ZZ, ZZ::owned_add_ffn, ZZ::ref_add_ffn, []);
+impl_op!(impl_add_op, ZZ, usize, ZZ::owned_add_usize_ffn, ZZ::ref_add_usize_ffn, []);
 impl_assign_op!(impl_add_assign_op, ZZ, ZZ, ZZ::add_assign_ffn);
 impl_assign_op!(impl_add_assign_op, ZZ, usize, ZZ::add_usize_assign_ffn);
 
-impl_op!(impl_sub_op, ZZ, ZZ, ZZ::sub_ffn, []);
-impl_op!(impl_sub_op, ZZ, usize, ZZ::sub_usize_ffn, []);
+impl_op!(impl_sub_op, ZZ, ZZ, ZZ::owned_sub_ffn, ZZ::ref_add_ffn, []);
+impl_op!(impl_sub_op, ZZ, usize, ZZ::owned_sub_usize_ffn, ZZ::ref_add_usize_ffn, []);
 impl_assign_op!(impl_sub_assign_op, ZZ, ZZ, ZZ::sub_assign_ffn);
 impl_assign_op!(impl_sub_assign_op, ZZ, usize, ZZ::sub_usize_assign_ffn);
 
-impl_op!(impl_mul_op, ZZ, ZZ, ZZ::mul_ffn, []);
-impl_op!(impl_mul_op, ZZ, usize, ZZ::mul_usize_ffn, []);
+impl_op!(impl_mul_op, ZZ, ZZ, ZZ::owned_mul_ffn, ZZ::ref_mul_ffn, []);
+impl_op!(impl_mul_op, ZZ, usize, ZZ::owned_mul_usize_ffn, ZZ::ref_mul_usize_ffn, []);
 impl_assign_op!(impl_mul_assign_op, ZZ, ZZ, ZZ::mul_assign_ffn);
 impl_assign_op!(impl_mul_assign_op, ZZ, usize, ZZ::mul_usize_assign_ffn);
+
+impl_op!(impl_div_op, ZZ, ZZ, ZZ::owned_div_ffn, ZZ::ref_div_ffn, []);
+impl_op!(impl_div_op, ZZ, usize, ZZ::owned_div_usize_ffn, ZZ::ref_div_usize_ffn, []);
+impl_assign_op!(impl_div_assign_op, ZZ, ZZ, ZZ::div_assign_ffn);
+impl_assign_op!(impl_div_assign_op, ZZ, usize, ZZ::div_usize_assign_ffn);
 
 impl_eq!(ZZ, ZZ::eq_ffn, []);
 
@@ -99,8 +156,31 @@ impl EqSupport for ZZ {}
 impl Neg for ZZ {
     type Output = Self;
 
+    fn neg(mut self) -> Self::Output {
+        self.0.neg_assign();
+        self
+    }
+}
+
+impl Neg for &ZZ {
+    type Output = ZZ;
+
     fn neg(self) -> Self::Output {
-        ZZ(self.0)
+        ZZ(self.0.clone().neg())
+    }
+}
+
+impl Neg for &mut ZZ {
+    type Output = ZZ;
+
+    fn neg(self) -> Self::Output {
+        ZZ(self.0.clone().neg())
+    }
+}
+
+impl NegAssign for ZZ {
+    fn neg_assign(&mut self) {
+        self.0.neg_assign();
     }
 }
 
@@ -121,14 +201,6 @@ impl MultiplicativeIdentity for ZZ {
 impl AdditiveInverse for ZZ {}
 impl AdditiveGroup for ZZ {}
 impl Ring for ZZ {}
-
-impl Div<&Self> for ZZ {
-    type Output = Self;
-
-    fn div(self, rhs: &Self) -> Self::Output {
-        Self::div_ffn(&self, rhs)
-    }
-}
 
 #[cfg(test)]
 mod tests {

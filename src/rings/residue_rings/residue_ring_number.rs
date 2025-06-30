@@ -4,7 +4,7 @@ use std::{
 };
 
 use rug::{
-    ops::RemRoundingAssign, Integer
+    ops::{NegAssign, RemRoundingAssign}, Integer
 };
 
 use crate::{
@@ -51,23 +51,45 @@ impl ZmodNumber {
         self.modulus = Some(ring.clone_modulus())
     }
 
+    pub fn set_modulus(&mut self, modulus: Option<Rc<Integer>>) {
+        self.modulus = modulus;
+    }
+
     fn clone_modulus(&self) -> Option<Rc<Integer>> {
         self.modulus.clone()
     }
 
     fn reduce_w_modulus(&mut self) {
-        if self.modulus.is_none() {
+        if self.modulus.is_none() || self.inner() < self.modulus().unwrap() { 
             return;
         }
         self.inner.rem_euc_assign(self.modulus.as_deref().unwrap());
     }
 
-    fn add_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_add_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        *lhs.inner_mut() += rhs.inner();
+        if lhs.modulus.is_none() {
+            let modulus = rhs.modulus.clone();
+            lhs.set_modulus(modulus);
+        }
+
+        lhs.reduce_w_modulus();
+        lhs
+    }
+
+    fn owned_add_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        *lhs.inner_mut() += rhs;
+
+        lhs.reduce_w_modulus();
+        lhs
+    }
+
+    fn ref_add_ffn(lhs: &Self, rhs: &Self) -> Self {
         let modulus = lhs.modulus.clone().or_else(|| rhs.modulus.clone());
         Self::new(lhs.inner().clone() + rhs.inner(), modulus)
     }
 
-    fn add_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_add_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         let modulus = lhs.modulus.clone();
         Self::new(lhs.inner().clone() + rhs, modulus)
     }
@@ -82,12 +104,34 @@ impl ZmodNumber {
         lhs.reduce_w_modulus();
     }
 
-    fn sub_ffn(lhs: &Self, rhs: &Self) -> Self {
+    //
+    // Subtraction
+    //
+
+    fn owned_sub_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        *lhs.inner_mut() -= rhs.inner();
+        if lhs.modulus.is_none() {
+            let modulus = rhs.modulus.clone();
+            lhs.set_modulus(modulus);
+        }
+
+        lhs.reduce_w_modulus();
+        lhs
+    }
+
+    fn owned_sub_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        *lhs.inner_mut() -= rhs;
+        lhs.reduce_w_modulus();
+
+        lhs
+    }
+
+    fn ref_sub_ffn(lhs: &Self, rhs: &Self) -> Self {
         let modulus = lhs.modulus.clone().or_else(|| rhs.modulus.clone());
         Self::new(lhs.inner().clone() - rhs.inner(), modulus)
     }
 
-    fn sub_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_sub_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         let modulus = lhs.modulus.clone();
         Self::new(lhs.inner().clone() - rhs, modulus)
     }
@@ -102,11 +146,28 @@ impl ZmodNumber {
         lhs.reduce_w_modulus();
     }
 
-    fn mul_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_mul_ffn(mut lhs: Self, rhs: &Self) -> Self {
+        *lhs.inner_mut() *= rhs.inner();
+        if lhs.modulus.is_none() {
+            let modulus = rhs.modulus.clone();
+            lhs.set_modulus(modulus);
+        }
+
+        lhs.reduce_w_modulus();
+        lhs
+    }
+    fn owned_mul_usize_ffn(mut lhs: Self, rhs: &usize) -> Self {
+        *lhs.inner_mut() *= rhs;
+        lhs.reduce_w_modulus();
+
+        lhs
+    }
+
+    fn ref_mul_ffn(lhs: &Self, rhs: &Self) -> Self {
         let modulus = lhs.modulus.clone().or_else(|| rhs.modulus.clone());
         Self::new(lhs.inner().clone() * rhs.inner(), modulus)
     }
-    fn mul_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
+    fn ref_mul_usize_ffn(lhs: &Self, rhs: &usize) -> Self {
         let modulus = lhs.modulus.clone();
         Self::new(lhs.inner().clone() * rhs, modulus)
     }
@@ -133,8 +194,10 @@ impl ZmodNumber {
 impl Neg for ZmodNumber {
     type Output = ZmodNumber;
 
-    fn neg(self) -> Self::Output {
-        ZmodNumber::new(-self.inner().clone(), self.clone_modulus())
+    fn neg(mut self) -> Self::Output {
+        self.inner.neg_assign();
+        self.reduce_w_modulus();
+        self
     }
 }
 
@@ -151,6 +214,20 @@ impl Neg for &mut ZmodNumber {
 
     fn neg(self) -> Self::Output {
         ZmodNumber::new(-self.inner().clone(), self.clone_modulus())
+    }
+}
+
+impl NegAssign for ZmodNumber {
+    fn neg_assign(&mut self) {
+        self.inner.neg_assign();
+        self.reduce_w_modulus();
+    }
+}
+
+impl NegAssign for &mut ZmodNumber {
+    fn neg_assign(&mut self) {
+        self.inner.neg_assign();
+        self.reduce_w_modulus();
     }
 }
 
@@ -184,12 +261,13 @@ impl MultiplicativeIdentity for ZmodNumber {
 // Addition
 //
 
-impl_op!(impl_add_op, ZmodNumber, ZmodNumber, ZmodNumber::add_ffn, []);
+impl_op!(impl_add_op, ZmodNumber, ZmodNumber, ZmodNumber::owned_add_ffn, ZmodNumber::ref_add_ffn, []);
 impl_op!(
     impl_add_op,
     ZmodNumber,
     usize,
-    ZmodNumber::add_usize_ffn,
+    ZmodNumber::owned_add_usize_ffn,
+    ZmodNumber::ref_add_usize_ffn,
     []
 );
 impl_assign_op!(
@@ -210,12 +288,13 @@ impl AddSupport for ZmodNumber {}
 // Subtraction
 //
 
-impl_op!(impl_sub_op, ZmodNumber, ZmodNumber, ZmodNumber::sub_ffn, []);
+impl_op!(impl_sub_op, ZmodNumber, ZmodNumber, ZmodNumber::owned_sub_ffn, ZmodNumber::ref_sub_ffn, []);
 impl_op!(
     impl_sub_op,
     ZmodNumber,
     usize,
-    ZmodNumber::sub_usize_ffn,
+    ZmodNumber::owned_sub_usize_ffn,
+    ZmodNumber::ref_sub_usize_ffn,
     []
 );
 impl_assign_op!(
@@ -236,12 +315,13 @@ impl SubSupport for ZmodNumber {}
 // Multiplication
 //
 
-impl_op!(impl_mul_op, ZmodNumber, ZmodNumber, ZmodNumber::mul_ffn, []);
+impl_op!(impl_mul_op, ZmodNumber, ZmodNumber, ZmodNumber::owned_mul_ffn,ZmodNumber::ref_mul_ffn, []);
 impl_op!(
     impl_mul_op,
     ZmodNumber,
     usize,
-    ZmodNumber::mul_usize_ffn,
+    ZmodNumber::owned_mul_usize_ffn,
+    ZmodNumber::ref_mul_usize_ffn,
     []
 );
 impl_assign_op!(

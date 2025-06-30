@@ -1,6 +1,7 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Rem, Sub, SubAssign};
 
 use itertools::Itertools;
+use rug::ops::NegAssign;
 
 use crate::{
     impl_add_assign_op, impl_add_op, impl_eq, impl_mul_assign_op, impl_mul_op, impl_op,
@@ -83,6 +84,12 @@ impl<R: Ring + Clone> Polynomial<R> {
         &self.coefficients
     }
 
+    /// Returns a mutable reference to the coefficients of this [`Polynomial<R>`].
+    pub fn coefficients_mut(&mut self) -> &mut Vec<R> {
+        &mut self.coefficients
+    }
+
+    /// Returns the i:th coefficient if it exists
     pub fn coefficient(&self, i: usize) -> Option<R> {
         self.coefficients.get(i).cloned()
     }
@@ -115,7 +122,11 @@ impl<R: Ring + Clone> Polynomial<R> {
     // Addition
     //
 
-    fn add_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_add_ffn(lhs: Self, rhs: &Self) -> Self {
+        Polynomial::ref_add_ffn(&lhs, rhs)
+    }
+
+    fn ref_add_ffn(lhs: &Self, rhs: &Self) -> Self {
         if lhs.is_zero() {
             return rhs.clone();
         }
@@ -150,7 +161,11 @@ impl<R: Ring + Clone> Polynomial<R> {
     // Subtraction
     //
 
-    fn sub_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn owned_sub_ffn(lhs: Self, rhs: &Self) -> Self {
+        Polynomial::ref_sub_ffn(&lhs, rhs)
+    }
+
+    fn ref_sub_ffn(lhs: &Self, rhs: &Self) -> Self {
         if lhs.is_zero() {
             return -rhs.clone();
         }
@@ -184,7 +199,17 @@ impl<R: Ring + Clone> Polynomial<R> {
     // Scalar Multiplication
     //
 
-    fn scalar_mul_ffn(lhs: &Self, scalar: &R) -> Self {
+    fn owned_scalar_mul_ffn(mut lhs: Self, scalar: &R) -> Self {
+        if *scalar == R::zero() {
+            return Self::new();
+        }
+
+        let mut_coeffs = lhs.coefficients_mut();
+        (0..mut_coeffs.len()).for_each(|i| mut_coeffs[i] *= scalar);
+        lhs
+    }
+
+    fn ref_scalar_mul_ffn(lhs: &Self, scalar: &R) -> Self {
         if *scalar == R::zero() {
             return Self::new();
         }
@@ -207,8 +232,13 @@ impl<R: Ring + Clone> Polynomial<R> {
     // Polynomial Multiplication
     //
 
+    #[inline]
+    fn owned_polynomial_mul_ffn(lhs: Self, rhs: &Self) -> Self {
+        Polynomial::ref_polynomial_mul_ffn(&lhs, rhs)
+    }
+
     /// Function for multiplying two polynomials.
-    fn polynomial_mul_ffn(lhs: &Self, rhs: &Self) -> Self {
+    fn ref_polynomial_mul_ffn(lhs: &Self, rhs: &Self) -> Self {
         match (lhs.coefficients().len(), rhs.coefficients().len()) {
             (0, _) => Polynomial::new(),
             (_, 0) => Polynomial::new(),
@@ -234,7 +264,7 @@ impl<R: Ring + Clone> Polynomial<R> {
                 left_coeff.resize(n, R::zero());
                 right_coeff.resize(n, R::zero());
 
-                let res_coeff = Polynomial::poly_mul_internal(&left_coeff, &right_coeff);
+                let res_coeff = Polynomial::karatsuba_poly_mul_internal(&left_coeff, &right_coeff);
                 Polynomial::from_owned_coefficients(res_coeff)
             }
         }
@@ -247,7 +277,7 @@ impl<R: Ring + Clone> Polynomial<R> {
 
     /// Function for multiplying two polynomials by their coefficients. Assumes that the
     /// coefficient vectors have the same length, and are not empty.
-    fn poly_mul_internal(lhs: &[R], rhs: &[R]) -> Vec<R> {
+    fn karatsuba_poly_mul_internal(lhs: &[R], rhs: &[R]) -> Vec<R> {
         match (lhs.len(), rhs.len()) {
             (0, _) => vec![],
             (1, _) => vec![lhs[0].clone() * &rhs[0]],
@@ -263,17 +293,16 @@ impl<R: Ring + Clone> Polynomial<R> {
 
                 vec![ac, ad + bc, bd]
             }
-            (d, _) => {
-                // Karatsuba polynomial multiplication: O(n^1.6)
+            (d, _) => { // Karatsuba polynomial multiplication: O(n^1.6)
                 let k = d / 2;
 
                 let (p0, p1) = lhs.split_at(k);
                 let (q0, q1) = rhs.split_at(k);
 
-                let p0q0 = Polynomial::poly_mul_internal(p0, q0);
-                let mut p1q0 = Polynomial::poly_mul_internal(p1, q0);
-                let p0q1 = Polynomial::poly_mul_internal(p0, q1);
-                let p1q1 = Polynomial::poly_mul_internal(p1, q1);
+                let p0q0 = Polynomial::karatsuba_poly_mul_internal(p0, q0);
+                let mut p1q0 = Polynomial::karatsuba_poly_mul_internal(p1, q0);
+                let p0q1 = Polynomial::karatsuba_poly_mul_internal(p0, q1);
+                let p1q1 = Polynomial::karatsuba_poly_mul_internal(p1, q1);
 
                 p0q1.iter().enumerate().for_each(|(i, c)| p1q0[i] += c);
 
@@ -388,7 +417,7 @@ macro_rules! impl_polynomial_assign_op {
 // Addition
 //
 
-impl_op!(impl_add_op, Polynomial<R>, Polynomial<R>, Polynomial::add_ffn, [R: Ring + Clone]);
+impl_op!(impl_add_op, Polynomial<R>, Polynomial<R>, Polynomial::owned_add_ffn, Polynomial::ref_add_ffn, [R: Ring + Clone]);
 impl_polynomial_assign_op!(
     impl_add_assign_op,
     Polynomial<R>,
@@ -400,7 +429,7 @@ impl<R: Ring + Clone> AddSupport for Polynomial<R> {}
 // Subtraction
 //
 
-impl_op!(impl_sub_op, Polynomial<R>, Polynomial<R>, Polynomial::sub_ffn, [R: Ring + Clone]);
+impl_op!(impl_sub_op, Polynomial<R>, Polynomial<R>, Polynomial::owned_sub_ffn, Polynomial::ref_sub_ffn, [R: Ring + Clone]);
 impl_polynomial_assign_op!(
     impl_sub_assign_op,
     Polynomial<R>,
@@ -417,7 +446,7 @@ impl<R: Ring + Clone> Neg for Polynomial<R> {
 
     fn neg(mut self) -> Self::Output {
         for coeff in self.coefficients.iter_mut() {
-            *coeff = -coeff.clone();
+            coeff.neg_assign();
         }
 
         self
@@ -428,14 +457,7 @@ impl<R: Ring + Clone> Neg for &Polynomial<R> {
     type Output = Polynomial<R>;
 
     fn neg(self) -> Self::Output {
-        let mut out =
-            Polynomial::from_owned_coefficients(Vec::with_capacity(self.coefficients.len()));
-
-        for i in 0..self.coefficients.len() {
-            out.coefficients.push(-self.coefficients[i].clone());
-        }
-
-        out
+        Polynomial::from_owned_coefficients(self.coefficients().iter().map(|c| c.clone().neg()).collect_vec())
     }
 }
 
@@ -443,14 +465,13 @@ impl<R: Ring + Clone> Neg for &mut Polynomial<R> {
     type Output = Polynomial<R>;
 
     fn neg(self) -> Self::Output {
-        let mut out =
-            Polynomial::from_owned_coefficients(Vec::with_capacity(self.coefficients.len()));
+        Polynomial::from_owned_coefficients(self.coefficients().iter().map(|c| c.clone().neg()).collect_vec())
+    }
+}
 
-        for i in 0..self.coefficients.len() {
-            out.coefficients.push(-self.coefficients[i].clone());
-        }
-
-        out
+impl<R: Ring + Clone> NegAssign for Polynomial<R> {
+    fn neg_assign(&mut self) {
+        self.coefficients_mut().iter_mut().for_each(|c| c.neg_assign());
     }
 }
 
@@ -460,14 +481,14 @@ impl<R: Ring + Clone> AdditiveInverse for Polynomial<R> {}
 // Scalar Multiplication
 //
 
-impl_op!(impl_mul_op, Polynomial<R>, R, Polynomial::scalar_mul_ffn, [R: Ring + Clone]);
+impl_op!(impl_mul_op, Polynomial<R>, R, Polynomial::owned_scalar_mul_ffn, Polynomial<R>::ref_scalar_mul_ffn, [R: Ring + Clone]);
 impl_polynomial_assign_op!(impl_mul_assign_op, R, Polynomial::scalar_mul_assign_ffn);
 
 //
 // Polynomial Multiplication
 //
 
-impl_op!(impl_mul_op, Polynomial<R>, Polynomial<R>, Polynomial::polynomial_mul_ffn, [R: Ring + Clone]);
+impl_op!(impl_mul_op, Polynomial<R>, Polynomial<R>, Polynomial::owned_polynomial_mul_ffn, Polynomial<R>::ref_polynomial_mul_ffn, [R: Ring + Clone]);
 impl_polynomial_assign_op!(impl_mul_assign_op, Polynomial<R>, Polynomial::polynomial_mul_assign_ffn);
 impl<R: Ring + Clone> MulSupport for Polynomial<R> {}
 

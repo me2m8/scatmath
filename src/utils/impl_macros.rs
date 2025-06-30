@@ -12,7 +12,7 @@ macro_rules! impl_add_op {
             type Output = $out;
 
             fn add(self, rhs: $rhs) -> Self::Output {
-                $func(&self, &rhs)
+                $func(self, &rhs)
             }
         }
     };
@@ -47,7 +47,7 @@ macro_rules! impl_sub_op {
             type Output = $out;
 
             fn sub(self, rhs: $rhs) -> Self::Output {
-                $func(&self, &rhs)
+                $func(self, &rhs)
             }
         }
     };
@@ -82,7 +82,7 @@ macro_rules! impl_mul_op {
             type Output = $out;
 
             fn mul(self, rhs: $rhs) -> Self::Output {
-                $func(&self, &rhs)
+                $func(self, &rhs)
             }
         }
     };
@@ -117,7 +117,23 @@ macro_rules! impl_div_op {
             type Output = $out;
 
             fn div(self, rhs: $rhs) -> Self::Output {
-                $func(&self, &rhs)
+                $func(self, &rhs)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_div_assign_op {
+    (
+        type = $ty:ty,
+        rhs = $rhs:ty,
+        func = $func:path,
+        bounds = [$($bounds:tt)*]
+    ) => {
+        impl<$($bounds)*> DivAssign<$rhs> for $ty {
+            fn div_assign(&mut self, rhs: $rhs) {
+                $func(self, &rhs)
             }
         }
     };
@@ -151,18 +167,19 @@ macro_rules! impl_op {
         $op_impl:ident,
         $type:ty,
         $rhs:ty,
-        $func:path,
+        $owned_func:path,
+        $ref_func:path,
         [$($bounds:tt)*]
     ) => {
-        $op_impl!(type = $type, rhs = $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = $type, rhs = &$rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = $type, rhs = &mut $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &$type, rhs = $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &$type, rhs = &$rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &$type, rhs = &mut $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &mut $type, rhs = $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &mut $type, rhs = &$rhs, out = $type, func = $func, bounds = [$($bounds)*]);
-        $op_impl!(type = &mut $type, rhs = &mut $rhs, out = $type, func = $func, bounds = [$($bounds)*]);
+        $op_impl!(type = $type, rhs = $rhs, out = $type, func = $owned_func, bounds = [$($bounds)*]);
+        $op_impl!(type = $type, rhs = &$rhs, out = $type, func = $owned_func, bounds = [$($bounds)*]);
+        $op_impl!(type = $type, rhs = &mut $rhs, out = $type, func = $owned_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &$type, rhs = $rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &$type, rhs = &$rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &$type, rhs = &mut $rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &mut $type, rhs = $rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &mut $type, rhs = &$rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
+        $op_impl!(type = &mut $type, rhs = &mut $rhs, out = $type, func = $ref_func, bounds = [$($bounds)*]);
     };
 }
 

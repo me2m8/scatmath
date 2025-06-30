@@ -12,7 +12,18 @@ impl Polynomial<ZZ> {
         Polynomial::from_owned_coefficients(coeffs)
     }
 
-    fn scalar_mul_usize_ffn(lhs: &Self, scalar: &usize) -> Self {
+    fn owned_scalar_mul_usize_ffn(mut lhs: Self, scalar: &usize) -> Self {
+        if *scalar == 0 {
+            lhs.coefficients_mut().clear();
+            return lhs;
+        }
+
+        let mut_coeffs = lhs.coefficients_mut();
+        (0..mut_coeffs.len()).for_each(|i| mut_coeffs[i] *= scalar);
+        lhs
+    }
+
+    fn ref_scalar_mul_usize_ffn(lhs: &Self, scalar: &usize) -> Self {
         if *scalar == 0 {
             return Self::new();
         }
@@ -23,12 +34,10 @@ impl Polynomial<ZZ> {
     }
 }
 
-impl_op!(impl_mul_op, Polynomial<ZZ>, usize, Polynomial<ZZ>::scalar_mul_usize_ffn, []);
+impl_op!(impl_mul_op, Polynomial<ZZ>, usize, Polynomial<ZZ>::owned_scalar_mul_usize_ffn, Polynomial<ZZ>::ref_scalar_mul_usize_ffn, []);
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
-
     use itertools::Itertools;
 
     use crate::{

@@ -1,6 +1,7 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use rug::ops::NegAssign;
 
-pub trait AdditiveInverse: Neg<Output = Self> {}
+pub trait AdditiveInverse: Neg<Output = Self> + NegAssign {}
 
 pub trait AdditiveIdentity: Sized {
     const ZERO: Self;
